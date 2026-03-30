@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Mail, Lock, User, Shield } from "lucide-react";
+import { BookOpen, Mail, Lock, User, Shield, Chrome } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function Login() {
@@ -20,7 +20,7 @@ export default function Login() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [loginRole, setLoginRole] = useState<"user" | "admin">("user");
-  const { login, register } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -64,6 +64,20 @@ export default function Login() {
       toast({
         title: "Registration failed",
         description: result.error || "An error occurred during registration.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    setIsLoading(true);
+    const result = await loginWithGoogle();
+    setIsLoading(false);
+
+    if (!result.success) {
+      toast({
+        title: "Google login failed",
+        description: result.error || "Unable to login with Google.",
         variant: "destructive",
       });
     }
@@ -153,6 +167,24 @@ export default function Login() {
                     <Button type="submit" className="w-full gradient-accent text-accent-foreground border-0" disabled={isLoading}>
                       {isLoading ? "Signing In..." : "Sign In"}
                     </Button>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                      </div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
+                    >
+                      <Chrome className="h-4 w-4" />
+                      Sign in with Google
+                    </Button>
                   </CardContent>
                 </form>
               </TabsContent>
@@ -206,6 +238,24 @@ export default function Login() {
                     </div>
                     <Button type="submit" className="w-full gradient-accent text-accent-foreground border-0" disabled={isLoading}>
                       {isLoading ? "Creating Account..." : "Create Account"}
+                    </Button>
+                    <div className="relative">
+                      <div className="absolute inset-0 flex items-center">
+                        <span className="w-full border-t border-border" />
+                      </div>
+                      <div className="relative flex justify-center text-xs uppercase">
+                        <span className="bg-background px-2 text-muted-foreground">Or</span>
+                      </div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      className="w-full gap-2"
+                      onClick={handleGoogleLogin}
+                      disabled={isLoading}
+                    >
+                      <Chrome className="h-4 w-4" />
+                      Sign up with Google
                     </Button>
                   </CardContent>
                 </form>
