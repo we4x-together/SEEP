@@ -81,7 +81,7 @@ class RateLimiter {
 
           console.warn(`Rate limiter retry ${request.retries}/${this.maxRetries} after ${delay}ms`, error?.message);
 
-          // Re-queue with delay while preserving priority order.
+          // Re-queue with delay while preserving priority order
           setTimeout(() => {
             this.queue.push(request);
             this.queue.sort((a, b) => b.priority - a.priority);
