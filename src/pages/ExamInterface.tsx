@@ -6,6 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/lib/supabase";
 import { Exam, ExamQuestion } from "@/types/exam";
 import { Clock, ChevronLeft, ChevronRight, Flag, Loader2, AlertTriangle, Maximize, ShieldAlert, CheckCircle2, Timer } from "lucide-react";
@@ -28,6 +37,7 @@ export default function ExamInterface() {
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   // Security: Out of fullscreen timer
   const [fsViolationTime, setFsViolationTime] = useState<number>(10);
@@ -235,6 +245,10 @@ export default function ExamInterface() {
     return () => clearInterval(timer);
   }, [timeLeft, submitted, hasStarted, handleSubmit]);
 
+  const handleFinishClick = () => {
+    setShowConfirmDialog(true);
+  };
+
   if (!isAuthenticated) return <Navigate to="/login" />;
   if (isLoading) return <div className="flex min-h-screen items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-accent" /></div>;
   if (!exam) return <Navigate to="/dashboard" />;
@@ -320,6 +334,38 @@ export default function ExamInterface() {
         )}
       </AnimatePresence>
 
+      {/* Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-accent" />
+              Submit Exam?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3 pt-2">
+              <div>Are you sure you want to finish and submit your exam?</div>
+              <div className="bg-muted/50 p-3 rounded-lg text-sm space-y-1">
+                <p><strong>Questions Answered:</strong> {Object.keys(answers).length} / {questions.length}</p>
+                <p><strong>Time Remaining:</strong> {timeLeft !== null && Math.floor(timeLeft / 60)}:{(timeLeft || 0) % 60 < 10 ? "0" : ""}{(timeLeft || 0) % 60}</p>
+              </div>
+              <p className="text-xs text-muted-foreground">This action cannot be undone. You will be redirected to results after submission.</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end pt-4">
+            <AlertDialogCancel>Continue Exam</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowConfirmDialog(false);
+                handleSubmit(false);
+              }}
+              className="bg-accent hover:bg-accent/90"
+            >
+              Submit Exam
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <header className="sticky top-0 z-50 border-b border-border/50 bg-card/90 backdrop-blur-md">
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-3">
@@ -333,7 +379,7 @@ export default function ExamInterface() {
               <Clock className="h-4 w-4" />
               {timeLeft !== null && Math.floor(timeLeft / 60)}:{(timeLeft || 0) % 60 < 10 ? "0" : ""}{(timeLeft || 0) % 60}
             </div>
-            <Button size="sm" variant="destructive" onClick={() => handleSubmit(false)} className="gap-1">
+            <Button size="sm" variant="destructive" onClick={() => setShowConfirmDialog(true)} className="gap-1">
               <Flag className="h-3 w-3" /> Submit
             </Button>
           </div>
@@ -379,7 +425,7 @@ export default function ExamInterface() {
               <button key={i} onClick={() => setCurrentQ(i)} className={`h-2.5 w-2.5 rounded-full transition-all ${currentQ === i ? "bg-accent scale-125" : answers[questions[i].id] !== undefined ? "bg-accent/70" : "bg-muted-foreground/30"}`} />
             ))}
           </div>
-          <Button onClick={() => currentQ < questions.length - 1 ? setCurrentQ(c => c + 1) : handleSubmit(false)} className="gap-2 gradient-accent border-0 text-accent-foreground font-semibold">
+          <Button onClick={() => currentQ < questions.length - 1 ? setCurrentQ(c => c + 1) : handleFinishClick()} className="gap-2 gradient-accent border-0 text-accent-foreground font-semibold">
             {currentQ === questions.length - 1 ? "Finish" : "Next"} <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
