@@ -1,6 +1,6 @@
 import { Navbar } from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
-import { Navigate, Link } from "react-router-dom";
+import { Navigate, Link, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +29,7 @@ const fade = (i: number) => ({
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedExamId, setSelectedExamId] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"exams" | "results" | "users">("exams");
@@ -294,7 +295,8 @@ export default function AdminDashboard() {
                   <th className="p-4 text-left text-xs font-semibold uppercase text-muted-foreground">Exam</th>
                   <th className="p-4 text-left text-xs font-semibold uppercase text-muted-foreground">Score</th>
                   <th className="p-4 text-left text-xs font-semibold uppercase text-muted-foreground">Status</th>
-                  <th className="p-4 text-right text-xs font-semibold uppercase text-muted-foreground">Date</th>
+                  <th className="p-4 text-left text-xs font-semibold uppercase text-muted-foreground">Date</th>
+                  <th className="p-4 text-right text-xs font-semibold uppercase text-muted-foreground">Actions</th>
                 </tr></thead>
                 <tbody>{filteredResults.map(r => (
                   <tr key={r.id} className="border-b last:border-0 hover:bg-muted/30">
@@ -302,7 +304,17 @@ export default function AdminDashboard() {
                     <td className="p-4 text-muted-foreground">{r.examTitle}</td>
                     <td className="p-4 font-bold">{r.score}/{r.totalPoints} ({r.percentage}%)</td>
                     <td className="p-4"><Badge className={r.status === "passed" ? "bg-success text-success-foreground" : "bg-destructive text-destructive-foreground"}>{r.status}</Badge></td>
-                    <td className="p-4 text-right text-muted-foreground text-xs">{r.completedAt}</td>
+                    <td className="p-4 text-muted-foreground text-xs">{r.completedAt}</td>
+                    <td className="p-4 text-right">
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => navigate(`/admin/exam-analytics/${r.examId}`)}
+                        title="View Student Answers"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                    </td>
                   </tr>
                 ))}</tbody>
               </table></div></CardContent></Card>
