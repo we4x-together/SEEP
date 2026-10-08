@@ -13,6 +13,7 @@ import Results from "./pages/Results";
 import CreateExam from "./pages/CreateExam";
 import EditExam from "./pages/EditExam";
 import NotFound from "./pages/NotFound";
+import ExamAnalytics from "./pages/ExamAnalytics";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,6 +49,7 @@ const App = () => {
               <Route path="/results" element={<Results />} />
               <Route path="/admin/create-exam" element={<CreateExam />} />
               <Route path="/admin/edit-exam/:examId" element={<EditExam />} />
+              <Route path="/admin/exam-analytics/:examId" element={<ExamAnalytics />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
