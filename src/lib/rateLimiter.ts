@@ -10,20 +10,21 @@ interface QueuedRequest {
   resolve: (value: any) => void;
   reject: (reason?: any) => void;
   retries: number;
+  priority: number;
 }
 
 class RateLimiter {
   private queue: QueuedRequest[] = [];
   private activeRequests = 0;
   private requestTimestamps: number[] = [];
-  
+
   // Configuration
   private maxConcurrent = 10; // Conservative limit (out of 50 max connections)
   private maxRequestsPer60s = 150; // Conservative limit (out of 200 max)
   private requestWindow = 60000; // 60 seconds in ms
   private maxRetries = 3;
   private baseRetryDelay = 1000; // 1 second
-  
+
   constructor() {
     this.startProcessor();
   }
@@ -41,22 +42,11 @@ class RateLimiter {
         resolve,
         reject,
         retries: 0,
+        priority,
       };
 
-      // Insert by priority (higher priority first)
-      if (priority > 0) {
-        let inserted = false;
-        for (let i = 0; i < this.queue.length; i++) {
-          if (priority > (this.queue[i] as any).priority) {
-            this.queue.splice(i, 0, request);
-            inserted = true;
-            break;
-          }
-        }
-        if (!inserted) this.queue.push(request);
-      } else {
-        this.queue.push(request);
-      }
+      this.queue.push(request);
+      this.queue.sort((a, b) => b.priority - a.priority);
     });
   }
 
@@ -88,12 +78,13 @@ class RateLimiter {
         if (request.retries < this.maxRetries) {
           request.retries++;
           const delay = this.baseRetryDelay * Math.pow(2, request.retries - 1);
-          
+
           console.warn(`Rate limiter retry ${request.retries}/${this.maxRetries} after ${delay}ms`, error?.message);
-          
-          // Re-queue with delay
+
+          // Re-queue with delay while preserving priority order.
           setTimeout(() => {
-            this.queue.unshift(request);
+            this.queue.push(request);
+            this.queue.sort((a, b) => b.priority - a.priority);
           }, delay);
         } else {
           console.error(`Request failed after ${this.maxRetries} retries`, error);
@@ -145,8 +136,8 @@ class RateLimiter {
       maxConcurrent: this.maxConcurrent,
       maxRequestsPer60s: this.maxRequestsPer60s,
       utilisationPercent: Math.round(
-        ((this.activeRequests / this.maxConcurrent) * 100 + 
-         (recentRequests.length / this.maxRequestsPer60s) * 100) / 2
+        ((this.activeRequests / this.maxConcurrent) * 100 +
+          (recentRequests.length / this.maxRequestsPer60s) * 100) / 2
       ),
     };
   }
@@ -175,7 +166,7 @@ export const rateLimiter = new RateLimiter();
  */
 export function useRateLimiter() {
   return {
-    execute: (fn: () => Promise<any>, priority?: number) => 
+    execute: (fn: () => Promise<any>, priority?: number) =>
       rateLimiter.execute(fn, priority),
     getStatus: () => rateLimiter.getStatus(),
     configure: (config: any) => rateLimiter.configure(config),
