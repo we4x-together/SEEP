@@ -23,7 +23,7 @@ export default function ExamInterface() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasStarted, setHasStarted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
   const [currentQ, setCurrentQ] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -37,7 +37,7 @@ export default function ExamInterface() {
     if (isAuthenticated && examId) {
       fetchExamData();
     }
-    
+
     const handleFsChange = () => {
       setIsFullscreen(!!document.fullscreenElement);
     };
@@ -82,24 +82,27 @@ export default function ExamInterface() {
   const fetchExamData = async () => {
     setIsLoading(true);
     try {
-      // Use rate limiter for exam queries
-      const { data: examData, error: examError } = await rateLimitedQuery(() =>
-        supabase
-          .from('exams')
-          .select('*')
-          .eq('id', examId)
-          .single()
-      );
+      // Fetch exam + questions concurrently to reduce round trips.
+      const [examResult, questionResult] = await Promise.all([
+        rateLimitedQuery(() =>
+          supabase
+            .from('exams')
+            .select('*')
+            .eq('id', examId)
+            .single()
+        ),
+        rateLimitedQuery(() =>
+          supabase
+            .from('questions')
+            .select('*')
+            .eq('exam_id', examId)
+        )
+      ]);
+
+      const { data: examData, error: examError } = examResult;
+      const { data: qData, error: qError } = questionResult;
 
       if (examError) throw examError;
-
-      const { data: qData, error: qError } = await rateLimitedQuery(() =>
-        supabase
-          .from('questions')
-          .select('*')
-          .eq('exam_id', examId)
-      );
-
       if (qError) throw qError;
 
       setExam({
@@ -135,7 +138,7 @@ export default function ExamInterface() {
   const startExam = async () => {
     try {
       await document.documentElement.requestFullscreen();
-      
+
       let { data: attempt } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -180,36 +183,34 @@ export default function ExamInterface() {
   const handleSubmit = useCallback(async (isAutoSubmit = false) => {
     if (submitted || !exam || !user) return;
     setSubmitted(true);
-    
+
     if (violationTimerRef.current) clearInterval(violationTimerRef.current);
     if (document.fullscreenElement) {
       document.exitFullscreen().catch(() => {});
     }
 
     if (isAutoSubmit && timeLeft && timeLeft > 0) {
-        // Only show if it wasn't a normal timeout
-        toast.info("Submitting your exam automatically...");
+      toast.info("Submitting your exam automatically...");
     }
 
     try {
-      // Use rate limiter with high priority for exam submission
       const { data, error } = await rateLimitedQuery(() =>
         supabase.rpc('submit_exam', {
           p_exam_id: exam.id,
           p_answers: answers,
           p_time_taken: Math.max(0, (exam.duration * 60) - (timeLeft || 0))
         }),
-        2 // Higher priority than regular queries
+        2
       );
 
       if (error) throw error;
 
       navigate("/results", {
-        state: { 
-          score: data.score, 
-          total: data.total_points, 
-          answers, 
-          questions, 
+        state: {
+          score: data.score,
+          total: data.total_points,
+          answers,
+          questions,
           examTitle: exam.title,
           percentage: data.percentage,
           status: data.status,
@@ -293,8 +294,8 @@ export default function ExamInterface() {
     <div className="min-h-screen bg-background select-none">
       <AnimatePresence>
         {showFsBlocker && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex items-center justify-center p-6 text-center">
-            <div className="max-w-md space-y-6">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex items-center justify-center p-4">
+            <div className="max-w-md space-y-6 text-center">
               <div className="mx-auto h-24 w-24 rounded-full bg-destructive/10 flex items-center justify-center relative">
                 <ShieldAlert className="h-12 w-12 text-destructive animate-pulse" />
                 <div className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground h-10 w-10 rounded-full flex items-center justify-center font-bold text-xl border-4 border-background">
@@ -345,7 +346,7 @@ export default function ExamInterface() {
             <span>Question {currentQ + 1} of {questions.length}</span>
             <span>{Object.keys(answers).length} answered</span>
           </div>
-          <Progress value={((currentQ + 1) / questions.length) * 100} className="h-2" />
+          <Progress value={questions.length ? ((currentQ + 1) / questions.length) * 100 : 0} className="h-2" />
         </div>
 
         <AnimatePresence mode="wait">
@@ -355,7 +356,7 @@ export default function ExamInterface() {
                 <h2 className="text-xl font-bold mb-6 whitespace-pre-wrap">{questions[currentQ]?.question}</h2>
                 <div className="grid gap-3">
                   {questions[currentQ]?.options?.map((option, idx) => (
-                    <button key={idx} onClick={() => setAnswers({ ...answers, [questions[currentQ].id]: idx })}
+                    <button key={idx} onClick={() => setAnswers(prev => ({ ...prev, [questions[currentQ].id]: idx }))}
                       className={`flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all ${
                         answers[questions[currentQ].id] === idx ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border/50 hover:border-accent/30 hover:bg-muted/50"
                       }`}>
@@ -375,7 +376,7 @@ export default function ExamInterface() {
           <Button variant="outline" onClick={() => setCurrentQ(c => Math.max(0, c - 1))} disabled={currentQ === 0} className="gap-2"><ChevronLeft className="h-4 w-4" /> Previous</Button>
           <div className="hidden gap-1.5 sm:flex">
             {questions.map((_, i) => (
-              <button key={i} onClick={() => setCurrentQ(i)} className={`h-2.5 w-2.5 rounded-full transition-all ${currentQ === i ? "bg-accent scale-125" : answers[questions[i].id] !== undefined ? "bg-accent/40" : "bg-muted"}`} />
+              <button key={i} onClick={() => setCurrentQ(i)} className={`h-2.5 w-2.5 rounded-full transition-all ${currentQ === i ? "bg-accent scale-125" : answers[questions[i].id] !== undefined ? "bg-accent/70" : "bg-muted-foreground/30"}`} />
             ))}
           </div>
           <Button onClick={() => currentQ < questions.length - 1 ? setCurrentQ(c => c + 1) : handleSubmit(false)} className="gap-2 gradient-accent border-0 text-accent-foreground font-semibold">
